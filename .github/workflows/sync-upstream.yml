@@ -21,6 +21,7 @@ jobs:
     env:
       DEFAULT_BRANCH: main
       UPSTREAM_REPO: HKUDS/nanobot
+      HAS_SYNC_UPSTREAM_TOKEN: ${{ secrets.SYNC_UPSTREAM_TOKEN != '' && 'true' || 'false' }}
 
     steps:
     - name: Check out fork
@@ -128,7 +129,7 @@ jobs:
         done < "${{ steps.upstream_changes.outputs.new_tags_file }}"
 
     - name: Warn about downstream workflow triggers
-      if: steps.upstream_changes.outputs.tags_changed == 'true' && secrets.SYNC_UPSTREAM_TOKEN == ''
+      if: steps.upstream_changes.outputs.tags_changed == 'true' && env.HAS_SYNC_UPSTREAM_TOKEN != 'true'
       run: |
         echo "::warning::New upstream tags were synced, but they were pushed with GITHUB_TOKEN. GitHub will not trigger other workflows from those tag pushes. Add a repo secret named SYNC_UPSTREAM_TOKEN with a PAT or GitHub App token if you want tag pushes to trigger downstream workflows."
 
