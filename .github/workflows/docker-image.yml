@@ -3,14 +3,14 @@ name: Publish Docker Image
 on:
   workflow_call:
     inputs:
-      tags_json:
-        description: JSON array of tags to publish
+      tag:
+        description: Single tag to publish
         required: true
         type: string
   workflow_dispatch:
     inputs:
-      tags:
-        description: Comma-separated tags to publish, for example v0.1.4.post6,v0.1.4
+      tag:
+        description: Single tag to publish, for example v0.1.4.post6
         required: true
         type: string
 
@@ -23,52 +23,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      selected_tag: ${{ steps.resolve.outputs.selected_tag }}
-
-    steps:
-    - name: Resolve tag list
-      id: resolve
-      shell: bash
-      env:
-        INPUT_TAGS: ${{ inputs.tags }}
-        INPUT_TAGS_JSON: ${{ inputs.tags_json }}
-      run: |
-        set -euo pipefail
-
-        if [ "${{ github.event_name }}" = "workflow_call" ]; then
-          tags_json="${INPUT_TAGS_JSON}"
-        else
-          tags_json="$(printf '%s' "${INPUT_TAGS}" | jq -Rc 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')"
-        fi
-
-        if [ -z "${tags_json}" ] || [ "${tags_json}" = "[]" ]; then
-          echo "No tags were provided for Docker image publishing." >&2
-          exit 1
-        fi
-
-        latest_tag="$(printf '%s' "${tags_json}" | jq -r '.[]' | sort -V | tail -n 1)"
-        if [ -z "${latest_tag}" ]; then
-          echo "Could not determine the latest tag to publish." >&2
-          exit 1
-        fi
-
-        echo "selected_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
-
   publish:
-    needs: prepare
     runs-on: ubuntu-latest
 
     steps:
     - name: Report selected tag
-      run: echo "Publishing Docker image for tag ${{ needs.prepare.outputs.selected_tag }}"
+      run: echo "Publishing Docker image for tag ${{ inputs.tag }}"
 
     - name: Check out source
       uses: actions/checkout@v4
       with:
-        ref: ${{ needs.prepare.outputs.selected_tag }}
+        ref: ${{ inputs.tag }}
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
@@ -89,7 +54,7 @@ jobs:
       with:
         images: ghcr.io/${{ github.repository_owner }}/nanobot
         tags: |
-          type=raw,value=${{ needs.prepare.outputs.selected_tag }}
+          type=raw,value=${{ inputs.tag }}
           type=sha,prefix=sha-
 
     - name: Build and push image

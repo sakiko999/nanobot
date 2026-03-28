@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tags_changed: ${{ steps.upstream_changes.outputs.tags_changed }}
-      new_tags_json: ${{ steps.upstream_changes.outputs.new_tags_json }}
+      latest_tag: ${{ steps.upstream_changes.outputs.latest_tag }}
     env:
       DEFAULT_BRANCH: main
       UPSTREAM_REPO: HKUDS/nanobot
@@ -88,12 +88,14 @@ jobs:
         echo "moved_tags_file=${moved_tags_file}" >> "$GITHUB_OUTPUT"
         echo "new_tag_count=${new_tag_count}" >> "$GITHUB_OUTPUT"
         echo "moved_tag_count=${moved_tag_count}" >> "$GITHUB_OUTPUT"
-        echo "new_tags_json=$(jq -Rsc 'split(\"\n\") | map(select(length > 0))' < "${new_tags_file}")" >> "$GITHUB_OUTPUT"
 
         if [ "${new_tag_count}" -gt 0 ]; then
+          latest_tag="$(sort -V "${new_tags_file}" | tail -n 1)"
           echo "tags_changed=true" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
         else
           echo "tags_changed=false" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Merge upstream main
@@ -145,4 +147,4 @@ jobs:
       packages: write
     uses: ./.github/workflows/docker-image.yml
     with:
-      tags_json: ${{ needs.sync.outputs.new_tags_json }}
+      tag: ${{ needs.sync.outputs.latest_tag }}
