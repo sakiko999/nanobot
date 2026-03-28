@@ -15,6 +15,9 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    outputs:
+      tags_changed: ${{ steps.upstream_changes.outputs.tags_changed }}
+      new_tags_json: ${{ steps.upstream_changes.outputs.new_tags_json }}
     env:
       DEFAULT_BRANCH: main
       UPSTREAM_REPO: HKUDS/nanobot
@@ -84,6 +87,7 @@ jobs:
         echo "moved_tags_file=${moved_tags_file}" >> "$GITHUB_OUTPUT"
         echo "new_tag_count=${new_tag_count}" >> "$GITHUB_OUTPUT"
         echo "moved_tag_count=${moved_tag_count}" >> "$GITHUB_OUTPUT"
+        echo "new_tags_json=$(jq -Rsc 'split(\"\n\") | map(select(length > 0))' < "${new_tags_file}")" >> "$GITHUB_OUTPUT"
 
         if [ "${new_tag_count}" -gt 0 ]; then
           echo "tags_changed=true" >> "$GITHUB_OUTPUT"
@@ -131,3 +135,10 @@ jobs:
     - name: Report no changes
       if: steps.upstream_changes.outputs.branch_changed == 'false' && steps.upstream_changes.outputs.tags_changed == 'false'
       run: echo "Fork is already up to date with upstream branch and tags."
+
+  publish_docker:
+    needs: sync
+    if: needs.sync.outputs.tags_changed == 'true'
+    uses: ./.github/workflows/docker-image.yml
+    with:
+      tags_json: ${{ needs.sync.outputs.new_tags_json }}
