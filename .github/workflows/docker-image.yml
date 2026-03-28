@@ -26,7 +26,7 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      tags_json: ${{ steps.resolve.outputs.tags_json }}
+      selected_tag: ${{ steps.resolve.outputs.selected_tag }}
 
     steps:
     - name: Resolve tag list
@@ -49,21 +49,26 @@ jobs:
           exit 1
         fi
 
-        echo "tags_json=${tags_json}" >> "$GITHUB_OUTPUT"
+        latest_tag="$(printf '%s' "${tags_json}" | jq -r '.[]' | sort -V | tail -n 1)"
+        if [ -z "${latest_tag}" ]; then
+          echo "Could not determine the latest tag to publish." >&2
+          exit 1
+        fi
+
+        echo "selected_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
 
   publish:
     needs: prepare
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        tag: ${{ fromJson(needs.prepare.outputs.tags_json) }}
 
     steps:
+    - name: Report selected tag
+      run: echo "Publishing Docker image for tag ${{ needs.prepare.outputs.selected_tag }}"
+
     - name: Check out source
       uses: actions/checkout@v4
       with:
-        ref: ${{ matrix.tag }}
+        ref: ${{ needs.prepare.outputs.selected_tag }}
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
@@ -84,7 +89,7 @@ jobs:
       with:
         images: ghcr.io/${{ github.repository_owner }}/nanobot
         tags: |
-          type=raw,value=${{ matrix.tag }}
+          type=raw,value=${{ needs.prepare.outputs.selected_tag }}
           type=sha,prefix=sha-
 
     - name: Build and push image
