@@ -140,6 +140,9 @@ jobs:
   publish_docker:
     needs: sync
     if: needs.sync.outputs.tags_changed == 'true'
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/docker-image.yml
     with:
       tags_json: ${{ needs.sync.outputs.new_tags_json }}
